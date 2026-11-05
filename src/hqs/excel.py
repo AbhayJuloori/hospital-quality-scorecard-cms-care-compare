@@ -119,7 +119,8 @@ def write_workbook(con: duckdb.DuckDBPyConnection, report: dict, path: Path, sta
            [[q["release"], q["source"], q["status"], q["cells"], q["pct"]] for q in report["quality_flags"]])
     r0 = len(report["quality_flags"]) + 4
     ws.cell(row=r0 - 1, column=1, value="Footnote codes (CMS Footnote Crosswalk)").font = Font(bold=True)
-    fns = con.execute("SELECT footnote_code, footnote_text FROM dim_footnote ORDER BY try_cast(footnote_code AS INT)").fetchall()
+    fns = con.execute(
+        "SELECT footnote_code, footnote_text FROM dim_footnote ORDER BY try_cast(footnote_code AS INT)").fetchall()
     _table(ws, ["Footnote", "Meaning"], fns, {2: 100}, start=r0)
     ws.freeze_panes = "A2"
 
