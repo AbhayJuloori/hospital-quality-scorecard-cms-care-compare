@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hospital-quality-scorecard"
+version = "1.0.0"
+description = "CMS Care Compare hospital quality scorecard: DuckDB SQL model, data quality flags, KPI tie-outs, Excel and Power BI deliverables"
+requires-python = ">=3.10"
+dependencies = ["duckdb>=1.1", "pandas>=2.0", "openpyxl>=3.1", "matplotlib>=3.8"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
