@@ -1,0 +1,82 @@
+{
+ "2024-07/FY_2024_Hospital_Readmissions_Reduction_Program_Hospital.csv": {
+  "bytes": 2119559,
+  "lines": 18775,
+  "sha256": "912744b8ba86c89ab44f383ff4d1216e7b83fa0eb82515500243df4d43726e23"
+ },
+ "2024-07/HCAHPS-Hospital.csv": {
+  "bytes": 148362721,
+  "lines": 445564,
+  "sha256": "bfb9268599e62ff1a0bd48b062749c903f4938ae08fa00221fc346e170291c92"
+ },
+ "2024-07/Healthcare_Associated_Infections-Hospital.csv": {
+  "bytes": 38613168,
+  "lines": 172477,
+  "sha256": "929fce7447d96c4123a3c6b0fdfb3033c846c26b872f695645927b44021af605"
+ },
+ "2024-07/Hospital_General_Information.csv": {
+  "bytes": 1466183,
+  "lines": 5399,
+  "sha256": "2ffecbd3c5669996f837720c8b33392ac69d7ae5c38a68d7a5918b45cf0d06fa"
+ },
+ "2024-07/Timely_and_Effective_Care-Hospital.csv": {
+  "bytes": 24790623,
+  "lines": 105456,
+  "sha256": "897bef634df795c0a0359ce8c0cab3ba80a594e204ccb591fba8b5a752fbf3d2"
+ },
+ "2025-07/FY_2025_Hospital_Readmissions_Reduction_Program_Hospital.csv": {
+  "bytes": 2087726,
+  "lines": 18511,
+  "sha256": "e98f7bb41abff04d9f8eae2c3a4fc548b9c37f3d437947e0cc70cd4aa409c86d"
+ },
+ "2025-07/HCAHPS-Hospital.csv": {
+  "bytes": 147461998,
+  "lines": 442216,
+  "sha256": "787148a237747b4955877a6e93b5b0659804dddb12a5798283a4c02329782bc4"
+ },
+ "2025-07/Healthcare_Associated_Infections-Hospital.csv": {
+  "bytes": 38335220,
+  "lines": 171181,
+  "sha256": "955e8d7018e1b2852849c06824b14176296755a9d836d0a0a35cbd9caf98278d"
+ },
+ "2025-07/Hospital_General_Information.csv": {
+  "bytes": 1454116,
+  "lines": 5382,
+  "sha256": "149f4cd6ec1406c1b54551f1882d9c634d6a4b5a8d4ce09795b7aee924dcb1bc"
+ },
+ "2025-07/Timely_and_Effective_Care-Hospital.csv": {
+  "bytes": 27692275,
+  "lines": 117934,
+  "sha256": "cd314dfd3cb13c2a5bf385c3e74666637dfe2f003324c6cb8b2dab17ae70b551"
+ },
+ "2026-07/FY_2026_Hospital_Readmissions_Reduction_Program_Hospital.csv": {
+  "bytes": 2068464,
+  "lines": 18331,
+  "sha256": "7e7915dd2751a1e59ac46dbc9194fb781e820962a04d47c31344ea2bb30c91f6"
+ },
+ "2026-07/HCAHPS-Hospital.csv": {
+  "bytes": 105461119,
+  "lines": 325721,
+  "sha256": "b70e598f29552df302e30ed649d178abd1b3d3c868ae97cf8e55453dd33898fc"
+ },
+ "2026-07/Healthcare_Associated_Infections-Hospital.csv": {
+  "bytes": 38629860,
+  "lines": 172441,
+  "sha256": "95283bf20e66c5f9271e6b0b98969d8655487b4d5fa074dcee6e204ee4574f3d"
+ },
+ "2026-07/Hospital_General_Information.csv": {
+  "bytes": 1450767,
+  "lines": 5420,
+  "sha256": "f874f09fef895a1ccf5bb7392dcbb2be05c9860339261b093fe00f0c1b013480"
+ },
+ "2026-07/Timely_and_Effective_Care-Hospital.csv": {
+  "bytes": 34150899,
+  "lines": 138085,
+  "sha256": "1e5a1ca803c2b09468fe3ae3fe60fef3e910f5f5300630a24791c88a1abff516"
+ },
+ "Footnote_Crosswalk.csv": {
+  "bytes": 3456,
+  "lines": 33,
+  "sha256": "5214e1468fb04c5cdeac8920f2c446cccaa65e2f6f929424cd228042a52d963e"
+ }
+}

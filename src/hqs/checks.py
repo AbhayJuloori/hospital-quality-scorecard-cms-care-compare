@@ -200,9 +200,10 @@ def run_all(con: duckdb.DuckDBPyConnection, raw_counts: dict) -> list[dict]:
 def quality_flags(con) -> list[dict]:
     """Per release x source: how many cells are reported, footnoted, suppressed, unavailable or missing."""
     rows = con.execute("""
-        SELECT release, source, status, count(*) AS cells,
-               round(100.0 * count(*) / sum(count(*)) OVER (PARTITION BY release, source), 2) AS pct
-        FROM fact_measure GROUP BY ALL ORDER BY release, source, status""").fetchall()
+        WITH c AS (SELECT release, source, status, count(*) AS cells FROM fact_measure GROUP BY ALL)
+        SELECT release, source, status, cells,
+               round(100.0 * cells / sum(cells) OVER (PARTITION BY release, source), 2) AS pct
+        FROM c ORDER BY release, source, status""").fetchall()
     return [dict(zip(["release", "source", "status", "cells", "pct"], r)) for r in rows]
 
 
