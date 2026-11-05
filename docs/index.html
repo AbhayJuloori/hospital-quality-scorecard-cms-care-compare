@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hospital Quality Scorecard</title>
+<meta name="description" content="CMS Care Compare hospital quality scorecard: DuckDB SQL model, data quality flags, KPI tie-outs, Indiana and New Jersey vs national peers.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f7f8fa;--panel:#ffffff;--ink:#16202c;--muted:#5b6675;--line:#dfe3e8;
+  --accent:#1f5fa8;--in:#c2571a;--nj:#2f7d4f;--nat:#6b7280;--good:#e3f2e6;--bad:#f8e1df;--goodink:#1f6b36;--badink:#9b2c22;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f141a;--panel:#171e26;--ink:#e6ebf1;--muted:#9aa5b3;--line:#2a333d;
+  --accent:#6aa5ec;--in:#f08a4b;--nj:#5cc18a;--nat:#9ca3af;--good:#173323;--bad:#3a1c1a;--goodink:#7fd59c;--badink:#f19a90;
+}}
+:root[data-theme="dark"]{
+  --bg:#0f141a;--panel:#171e26;--ink:#e6ebf1;--muted:#9aa5b3;--line:#2a333d;
+  --accent:#6aa5ec;--in:#f08a4b;--nj:#5cc18a;--nat:#9ca3af;--good:#173323;--bad:#3a1c1a;--goodink:#7fd59c;--badink:#f19a90;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+main{max-width:1120px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:19px;margin:36px 0 10px}
+p.lede{color:var(--muted);max-width:820px;margin:0 0 18px}
+a{color:var(--accent)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.tile .v{font-size:24px;font-weight:650}
+.tile .l{color:var(--muted);font-size:13px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:12px}
+.chart{position:relative;height:260px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-weight:600;color:var(--muted);cursor:default;position:sticky;top:0;background:var(--panel)}
+td.l,th.l{text-align:left;white-space:normal}
+.scroll{overflow:auto;max-height:520px}
+.pass{color:var(--goodink);font-weight:600}.fail{color:var(--badink);font-weight:600}
+td.g{background:var(--good);color:var(--goodink)}td.b{background:var(--bad);color:var(--badink)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+button.tab{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:5px 12px;border-radius:999px;cursor:pointer;font:inherit}
+button.tab[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+input[type=search]{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:5px 10px;border-radius:8px;font:inherit;min-width:200px}
+.note{color:var(--muted);font-size:13px}
+ul.changes{columns:2;font-size:13px;color:var(--muted);padding-left:18px}
+@media (max-width:640px){ul.changes{columns:1}h1{font-size:23px}}
+code{font-size:12.5px}
+</style>
+</head>
+<body>
+<main>
+<h1>Hospital Quality Scorecard</h1>
+<p class="lede">Five public CMS Care Compare files (star ratings, HRRP readmissions, HCAHPS patient survey, healthcare-associated
+infections, ED timeliness) joined across three annual releases in DuckDB SQL. Every suppressed, footnoted or unavailable cell is
+flagged, every KPI is tied back to the published CMS values, and Indiana and New Jersey hospitals are compared with state and
+national acute care peers. <a href="https://github.com/AbhayJuloori/hospital-quality-scorecard-cms-care-compare">Code and method on GitHub</a>.</p>
+
+<div class="tiles" id="tiles"></div>
+
+<h2>Checks: data quality and tie-outs to CMS</h2>
+<div class="panel scroll" style="max-height:none"><table id="checks"></table></div>
+
+<h2>Indiana and New Jersey vs national, latest release</h2>
+<div class="panel"><table id="bench"></table>
+<p class="note">Peer rules: ERR = median of hospital mean ERRs; SIR = sum(observed) / sum(predicted); HCAHPS = completed-survey weighted mean;
+ED = median of hospital medians. Acute care hospitals only.</p></div>
+
+<h2>Three-release trend</h2>
+<div class="grid2">
+  <div class="panel"><div class="chart"><canvas id="tStar"></canvas></div></div>
+  <div class="panel"><div class="chart"><canvas id="tErr"></canvas></div></div>
+  <div class="panel"><div class="chart"><canvas id="tEd"></canvas></div></div>
+  <div class="panel"><div class="chart"><canvas id="tSir"></canvas></div></div>
+</div>
+
+<h2>Distribution across U.S. acute care hospitals</h2>
+<div class="grid2">
+  <div class="panel"><div class="chart"><canvas id="hErr"></canvas></div></div>
+  <div class="panel"><div class="chart"><canvas id="hEd"></canvas></div></div>
+</div>
+
+<h2>Hospital scorecard</h2>
+<div class="panel">
+  <div class="controls">
+    <button class="tab" data-st="IN" aria-pressed="true">Indiana</button>
+    <button class="tab" data-st="NJ" aria-pressed="false">New Jersey</button>
+    <input type="search" id="q" placeholder="Filter hospital or city">
+    <span class="note" id="cnt"></span>
+  </div>
+  <div class="scroll"><table id="sc"></table></div>
+  <p class="note">Green / red = better / worse than the national acute care benchmark. Blank = CMS suppressed, not available or not applicable.
+  Percentiles are within U.S. acute care hospitals (100 = best).</p>
+</div>
+
+<h2>Cell status by file and release</h2>
+<div class="panel"><div class="chart" style="height:320px"><canvas id="qf"></canvas></div>
+<p class="note" id="qfnote"></p></div>
+
+<h2>Measures that changed between releases</h2>
+<div class="panel"><p class="note" id="mcnote"></p><ul class="changes" id="mc"></ul></div>
+
+<p class="note" style="margin-top:30px">Data: CMS Provider Data Catalog, hospitals theme (public). Releases 2024-07 and 2025-07 from the CMS archive,
+2026-07 from the live catalog. Descriptive comparisons of published measures, not causal claims.</p>
+</main>
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = (v, d=2) => v === null || v === undefined ? "" : (typeof v === "number" ? v.toLocaleString(undefined,{maximumFractionDigits:d, minimumFractionDigits: d===0?0:Math.min(d,1)}) : v);
+fetch("data/report.json").then(r => r.json()).then(R => {
+  const latest = R.latest_release, rel = R.releases;
+  const S = R.summary.find(s => s.release === latest), C = R.cells.find(c => c.release === latest);
+  const peer = (kpi, g, r=latest) => { const x = R.peer.find(p => p.kpi === kpi && p.peer_group === g && p.release === r); return x ? x.value : null; };
+  const tiles = [
+    [S.hospitals.toLocaleString(), `hospitals, ${latest} release`],
+    [R.cells.reduce((a,c)=>a+c.cells,0).toLocaleString(), "CMS cells modeled, 3 releases"],
+    [`${R.checks_passed}/${R.checks_total}`, "checks passing"],
+    [C.suppressed.toLocaleString(), `suppressed cells (${latest})`],
+    [C.footnoted.toLocaleString(), `reported with footnote (${latest})`],
+    [R.measure_changes.length, "measures added / dropped across releases"],
+  ];
+  document.getElementById("tiles").innerHTML = tiles.map(([v,l]) => `<div class="tile"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+
+  document.getElementById("checks").innerHTML = "<tr><th class='l'>ID</th><th class='l'>Check</th><th>Rows checked</th><th>Failed</th><th class='l'>Detail</th><th>Result</th></tr>" +
+    R.checks.map(c => `<tr><td class="l">${c.id}</td><td class="l">${c.name}</td><td>${c.checked.toLocaleString()}</td><td>${c.failed.toLocaleString()}</td><td class="l">${c.detail}</td><td class="${c.passed?'pass':'fail'}">${c.passed?'PASS':'FAIL'}</td></tr>`).join("");
+
+  const B = [
+    ["Mean overall star rating", "Overall star rating (mean)", false, 2],
+    ["Median hospital ERR", "ERR (median of hospital mean ERR)", true, 3],
+    ["CLABSI pooled SIR", "SIR HAI_1", true, 3],
+    ["CAUTI pooled SIR", "SIR HAI_2", true, 3],
+    ["MRSA pooled SIR", "SIR HAI_5", true, 3],
+    ["C. diff pooled SIR", "SIR HAI_6", true, 3],
+    ["Nurses always communicated well (%)", "Top box H_COMP_1_A_P", false, 1],
+    ["Rated hospital 9-10 (%)", "Top box H_HSP_RATING_9_10", false, 1],
+    ["Definitely recommend (%)", "Top box H_RECMND_DY", false, 1],
+    ["Median ED minutes (OP-18b)", "ED median minutes (OP_18b)", true, 0],
+  ];
+  const cls = (v, n, low) => v===null||n===null ? "" : ((low ? v < n : v > n) ? "g" : (v === n ? "" : "b"));
+  document.getElementById("bench").innerHTML = "<tr><th class='l'>KPI</th><th>Indiana</th><th>New Jersey</th><th>National</th></tr>" +
+    B.map(([lab,k,low,d]) => { const i = peer(k,"IN acute care"), j = peer(k,"NJ acute care"), n = peer(k,"National acute care");
+      return `<tr><td class="l">${lab}</td><td class="${cls(i,n,low)}">${fmt(i,d)}</td><td class="${cls(j,n,low)}">${fmt(j,d)}</td><td>${fmt(n,d)}</td></tr>`; }).join("");
+
+  Chart.defaults.color = css("--muted"); Chart.defaults.borderColor = css("--line"); Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  const groups = [["IN acute care","Indiana",css("--in")],["NJ acute care","New Jersey",css("--nj")],["National acute care","National",css("--nat")]];
+  const trend = (id, kpi, title) => new Chart(document.getElementById(id), {type:"line",
+    data:{labels:rel, datasets: groups.map(([g,l,c]) => ({label:l, data: rel.map(r => peer(kpi,g,r)), borderColor:c, backgroundColor:c, tension:.2}))},
+    options:{maintainAspectRatio:false, plugins:{title:{display:true,text:title}, legend:{position:"bottom"}}}});
+  trend("tStar","Overall star rating (mean)","Mean overall star rating");
+  trend("tErr","ERR (median of hospital mean ERR)","Median excess readmission ratio (lower is better)");
+  trend("tEd","ED median minutes (OP_18b)","Median ED minutes, OP-18b (lower is better)");
+  trend("tSir","SIR HAI_1","CLABSI pooled SIR (lower is better)");
+
+  const hist = (id, vals, lo, hi, step, title, lines) => {
+    const bins = []; for (let x = lo; x < hi; x += step) bins.push(x);
+    const counts = bins.map(b => vals.filter(v => v >= b && v < b + step).length);
+    new Chart(document.getElementById(id), {type:"bar",
+      data:{labels: bins.map(b => +b.toFixed(3)), datasets:[{label:"hospitals", data:counts, backgroundColor:css("--accent"), barPercentage:1, categoryPercentage:1}]},
+      options:{maintainAspectRatio:false, plugins:{legend:{display:false}, title:{display:true,text:title},
+        subtitle:{display:true,text:lines}}, scales:{x:{ticks:{maxTicksLimit:8}}}}});
+  };
+  const med = a => { const s=[...a].sort((x,y)=>x-y); return s[Math.floor(s.length/2)]; };
+  hist("hErr", R.distributions.err_mean, 0.8, 1.2, 0.01, `Hospital mean ERR, ${latest} (n=${R.distributions.err_mean.length})`,
+    `Median: national ${fmt(peer("ERR (median of hospital mean ERR)","National acute care"),3)} · IN ${fmt(peer("ERR (median of hospital mean ERR)","IN acute care"),3)} · NJ ${fmt(peer("ERR (median of hospital mean ERR)","NJ acute care"),3)}`);
+  hist("hEd", R.distributions.ed_median_minutes, 60, 400, 10, `Median ED minutes (OP-18b), ${latest} (n=${R.distributions.ed_median_minutes.length})`,
+    `Median of medians: national ${fmt(peer("ED median minutes (OP_18b)","National acute care"),0)} · IN ${fmt(peer("ED median minutes (OP_18b)","IN acute care"),0)} · NJ ${fmt(peer("ED median minutes (OP_18b)","NJ acute care"),0)}`);
+
+  const cols = [
+    ["facility_name","Hospital","l"],["city","City","l"],["hospital_type","Type","l"],
+    ["overall_star_rating","Stars",0,"Overall star rating (mean)",false],
+    ["err_mean","ERR mean",3,"ERR (median of hospital mean ERR)",true],["err_conditions_above_1","Cond. ERR>1",0],
+    ["sir_clabsi","CLABSI SIR",3,"SIR HAI_1",true],["sir_cauti","CAUTI SIR",3,"SIR HAI_2",true],["sir_cdiff","C.diff SIR",3,"SIR HAI_6",true],
+    ["hcahps_rating_9_10","Rating 9-10 %",0,"Top box H_HSP_RATING_9_10",false],["hcahps_recommend","Recommend %",0,"Top box H_RECMND_DY",false],
+    ["ed_median_minutes","ED min",0,"ED median minutes (OP_18b)",true],["err_pctile","ERR pctile",0],["ed_pctile","ED pctile",0]];
+  let st = "IN";
+  const draw = () => {
+    const q = document.getElementById("q").value.toLowerCase();
+    const rows = R.focus_states[st].filter(r => !q || (r.facility_name + " " + r.city).toLowerCase().includes(q));
+    document.getElementById("cnt").textContent = `${rows.length} hospitals`;
+    document.getElementById("sc").innerHTML = "<tr>" + cols.map(c => `<th class="${c[2]==='l'?'l':''}">${c[1]}</th>`).join("") + "</tr>" +
+      rows.map(r => "<tr>" + cols.map(([k,,d,bk,low]) => {
+        if (d === "l") return `<td class="l">${r[k] ?? ""}</td>`;
+        const v = r[k]; const n = bk ? peer(bk,"National acute care") : null;
+        const c = bk && v !== null && n !== null ? cls(v,n,low) : "";
+        return `<td class="${c}">${fmt(v,d)}</td>`; }).join("") + "</tr>").join("");
+  };
+  document.querySelectorAll("button.tab").forEach(b => b.onclick = () => { st = b.dataset.st;
+    document.querySelectorAll("button.tab").forEach(x => x.setAttribute("aria-pressed", x === b)); draw(); });
+  document.getElementById("q").oninput = draw; draw();
+
+  const statuses = ["reported","reported_footnoted","suppressed","not_available","categorical","missing"];
+  const scol = {reported:css("--accent"), reported_footnoted:"#8fb3de", suppressed:css("--in"), not_available:css("--nat"), categorical:"#b59ad6", missing:"#d14"};
+  const keys = []; R.quality_flags.forEach(q => { const k = `${q.source} ${q.release}`; if (!keys.includes(k)) keys.push(k); });
+  new Chart(document.getElementById("qf"), {type:"bar",
+    data:{labels:keys, datasets: statuses.map(s => ({label:s.replace("_"," "), backgroundColor:scol[s],
+      data: keys.map(k => { const x = R.quality_flags.find(q => `${q.source} ${q.release}` === k && q.status === s); return x ? x.pct : 0; })}))},
+    options:{maintainAspectRatio:false, scales:{x:{stacked:true, ticks:{autoSkip:false, maxRotation:60, minRotation:45}}, y:{stacked:true, max:100, title:{display:true,text:"% of cells"}}},
+      plugins:{legend:{position:"bottom"}}}});
+  document.getElementById("qfnote").textContent = `${latest}: ${C.cells.toLocaleString()} cells; ${C.suppressed.toLocaleString()} suppressed (too few cases or CMS suppression), ${C.footnoted.toLocaleString()} reported with a footnote, ${C.not_available.toLocaleString()} not available, ${C.missing} blank.`;
+
+  document.getElementById("mcnote").textContent = `${R.measure_changes.length} measure IDs exist in some releases but not others. A trend built on measure IDs alone breaks at these points.`;
+  document.getElementById("mc").innerHTML = R.measure_changes.map(m => `<li><code>${m.measure_id}</code> (${m.source}) ${m.first_release} to ${m.last_release}</li>`).join("");
+});
+</script>
+</body>
+</html>

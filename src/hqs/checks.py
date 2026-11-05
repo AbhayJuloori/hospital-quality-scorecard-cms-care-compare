@@ -91,7 +91,7 @@ def single_period(con) -> Check:
         FROM fact_measure WHERE source IN ('hrrp', 'hai') AND period_end IS NOT NULL
         GROUP BY 1, 2 HAVING count(DISTINCT period_end) > 1""").fetchall()
     return Check("DQ06", "consistency", "HRRP and HAI each cover one reporting period per release",
-                 not rows, str(rows) or "ok", 6, len(rows))
+                 not rows, str(rows) if rows else "one period each", 6, len(rows))
 
 
 def hrrp_suppression(con) -> Check:
