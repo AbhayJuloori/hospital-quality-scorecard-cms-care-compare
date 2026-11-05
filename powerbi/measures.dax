@@ -1,0 +1,140 @@
+// Hospital Quality Scorecard: DAX measures
+// Model (load the CSVs from data/export after `python -m hqs.run`):
+//   Release[release]                      1 -> *  Hospital[release]
+//   Hospital[HospitalKey]                 1 -> *  HRRP / HAI / TopBox / Scorecard / Fact [HospitalKey]
+// Add HospitalKey = [release] & "|" & [facility_id] as a calculated column on every table.
+// Release is a one-column table: Release = DISTINCT ( Hospital[release] ).
+// SQL equivalents of every benchmark live in mart_peer (sql/02_marts.sql) and are what the Excel workbook and
+// the web page show. These DAX measures follow the same pooling rules; they were written against the exported
+// tables but not executed in this repo (Power BI Desktop is Windows only).
+
+// ---------- Overall ----------
+Avg Star Rating =
+AVERAGE ( Hospital[overall_star_rating] )
+
+Hospitals =
+DISTINCTCOUNT ( Hospital[HospitalKey] )
+
+// ---------- Readmissions (HRRP) ----------
+// Hospital summary ERR: unweighted mean of the condition ERRs CMS reported (blanks are ignored).
+ERR Mean =
+AVERAGE ( HRRP[excess_readmission_ratio] )
+
+Conditions ERR > 1 =
+COUNTROWS ( FILTER ( HRRP, HRRP[excess_readmission_ratio] > 1 ) )
+
+Conditions Reported =
+COUNTROWS ( FILTER ( HRRP, NOT ISBLANK ( HRRP[excess_readmission_ratio] ) ) )
+
+// Peer benchmark: median of hospital summary ERRs. REMOVEFILTERS(Hospital) also clears the
+// Release filter (Release sits in Hospital's expanded table), so VALUES(Release[release]) puts it back.
+ERR Peer Median National =
+CALCULATE (
+    MEDIANX ( VALUES ( Hospital[HospitalKey] ), [ERR Mean] ),
+    REMOVEFILTERS ( Hospital ),
+    VALUES ( Release[release] ),
+    Hospital[hospital_type] = "Acute Care Hospitals"
+)
+
+ERR Peer Median State =
+VAR st = SELECTEDVALUE ( Hospital[state] )
+RETURN
+    CALCULATE (
+        MEDIANX ( VALUES ( Hospital[HospitalKey] ), [ERR Mean] ),
+        REMOVEFILTERS ( Hospital ),
+        VALUES ( Release[release] ),
+        Hospital[state] = st,
+        Hospital[hospital_type] = "Acute Care Hospitals"
+    )
+
+// ---------- Infections (HAI) ----------
+// Pooled SIR = sum(observed) / sum(predicted) over rows where CMS published an SIR (NHSN method).
+// Slice by HAI[hai_id] (HAI_1 CLABSI, HAI_2 CAUTI, HAI_3 SSI colon, HAI_4 SSI hysterectomy, HAI_5 MRSA, HAI_6 C. diff).
+SIR Pooled =
+VAR rows_ = FILTER ( HAI, NOT ISBLANK ( HAI[sir] ) )
+RETURN
+    DIVIDE ( SUMX ( rows_, HAI[observed] ), SUMX ( rows_, HAI[predicted] ) )
+
+SIR Pooled National =
+CALCULATE (
+    [SIR Pooled],
+    REMOVEFILTERS ( Hospital ),
+    VALUES ( Release[release] ),
+    Hospital[hospital_type] = "Acute Care Hospitals"
+)
+
+SIR Pooled State =
+VAR st = SELECTEDVALUE ( Hospital[state] )
+RETURN
+    CALCULATE (
+        [SIR Pooled],
+        REMOVEFILTERS ( Hospital ),
+        VALUES ( Release[release] ),
+        Hospital[state] = st,
+        Hospital[hospital_type] = "Acute Care Hospitals"
+    )
+
+// ---------- Patient experience (HCAHPS) ----------
+// Slice by TopBox[measure_id]. Weighted by completed surveys so a 60-survey hospital does not
+// count as much as a 2,000-survey one.
+Top Box % (Survey Weighted) =
+VAR rows_ =
+    FILTER (
+        TopBox,
+        NOT ISBLANK ( TopBox[top_box_pct] ) && NOT ISBLANK ( TopBox[completed_surveys] )
+    )
+RETURN
+    DIVIDE (
+        SUMX ( rows_, TopBox[top_box_pct] * TopBox[completed_surveys] ),
+        SUMX ( rows_, TopBox[completed_surveys] )
+    )
+
+Top Box % National =
+CALCULATE (
+    [Top Box % (Survey Weighted)],
+    REMOVEFILTERS ( Hospital ),
+    VALUES ( Release[release] ),
+    Hospital[hospital_type] = "Acute Care Hospitals"
+)
+
+// ---------- ED timeliness ----------
+// OP-18b is itself a median, so it is only shown at hospital grain and benchmarked by the median of medians.
+ED Median Minutes =
+IF ( HASONEVALUE ( Hospital[HospitalKey] ), MAX ( Scorecard[ed_median_minutes] ) )
+
+ED Peer Median National =
+CALCULATE (
+    MEDIANX ( VALUES ( Hospital[HospitalKey] ), CALCULATE ( MAX ( Scorecard[ed_median_minutes] ) ) ),
+    REMOVEFILTERS ( Hospital ),
+    VALUES ( Release[release] ),
+    Hospital[hospital_type] = "Acute Care Hospitals"
+)
+
+LWBS % =
+IF ( HASONEVALUE ( Hospital[HospitalKey] ), MAX ( Scorecard[ed_left_without_seen_pct] ) )
+
+// ---------- Data quality ----------
+Flagged Cell % =
+DIVIDE (
+    COUNTROWS ( FILTER ( Fact, Fact[status] IN { "suppressed", "not_available", "missing", "reported_footnoted" } ) ),
+    COUNTROWS ( Fact )
+)
+
+Suppressed Cells =
+COUNTROWS ( FILTER ( Fact, Fact[status] = "suppressed" ) )
+
+// ---------- Conditional formatting helpers (1 = better than national, -1 = worse) ----------
+ERR vs National =
+VAR v = [ERR Mean]
+VAR b = [ERR Peer Median National]
+RETURN IF ( ISBLANK ( v ) || ISBLANK ( b ), BLANK (), IF ( v < b, 1, IF ( v > b, -1, 0 ) ) )
+
+SIR vs National =
+VAR v = [SIR Pooled]
+VAR b = [SIR Pooled National]
+RETURN IF ( ISBLANK ( v ) || ISBLANK ( b ), BLANK (), IF ( v < b, 1, IF ( v > b, -1, 0 ) ) )
+
+Top Box vs National =
+VAR v = [Top Box % (Survey Weighted)]
+VAR b = [Top Box % National]
+RETURN IF ( ISBLANK ( v ) || ISBLANK ( b ), BLANK (), IF ( v > b, 1, IF ( v < b, -1, 0 ) ) )
